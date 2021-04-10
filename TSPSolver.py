@@ -10,12 +10,12 @@ else:
     raise Exception('Unsupported Version of PyQt: {}'.format(PYQT_VER))
 
 import time
+
 import numpy as np
 from random import randint
+from convex_hull import *
 
 from TSPClasses import *
-import heapq
-import itertools
 
 
 class TSPSolver:
@@ -78,6 +78,9 @@ class TSPSolver:
         algorithm</returns> 
     '''
 
+    # This determines my initial lower bound
+    # At worst the TIME COMPLEXITY is O(n^2) - I check each city's n edges (at most) n times
+    # Space complexity is O(n) n cities in an n-sized list
     def greedy(self, time_allowance=60.0):
         results = {}
         cities = self._scenario.getCities()
@@ -90,23 +93,29 @@ class TSPSolver:
         currentCity = cities[rand]
         route = [currentCity]
         start_time = time.time()
-        while not foundTour and time.time() - start_time < time_allowance:
+        while time.time() - start_time < time_allowance:
             tempCity = None
             leastDist = math.inf
             for i in range(ncities):
-                if cities[i] not in route:
-                    if currentCity.costTo(cities[i]) <= leastDist:
+                if cities[i] not in route:  # Check all cities not in the path
+                    if currentCity.costTo(cities[i]) < leastDist:  # if there is a path, take shortest
                         leastDist = currentCity.costTo(cities[i])
                         tempCity = cities[i]
-            if tempCity is not None:  # error checking for no path
-                currentCity = tempCity
+            if tempCity is not None:
+                currentCity = tempCity  # Move to next city and append it to path
+                route.append(tempCity)
+            else:
+                route.clear()  # This means no path - start with another city
+                currentCity = cities[randint(0, ncities - 1)]
                 route.append(currentCity)
-            if len(route) == ncities:
+
+            if len(route) == ncities:  # O(n) Space for route
                 bssf = TSPSolution(route)
-                if bssf.cost < np.inf:
+                if bssf.cost < np.inf:  # Path found - initial lower bound
                     foundTour = True
+                    break
                 else:
-                    route.clear()
+                    route.clear()  # No path found - no
                     currentCity = cities[randint(0, ncities - 1)]
                     route.append(currentCity)
 
@@ -118,28 +127,29 @@ class TSPSolver:
         results['max'] = None
         results['total'] = None
         results['pruned'] = None
+
         return results
 
-    ''' <summary>
-        This is the entry point for the branch-and-bound algorithm that you will implement
-        </summary>
-        <returns>results dictionary for GUI that contains three ints: cost of best solution, 
-        time spent to find best solution, total number solutions found during search (does
-        not include the initial BSSF), the best solution found, and three more ints: 
-        max queue size, total number of states created, and number of pruned states.</returns> 
-    '''
-
-    def branchAndBound(self, time_allowance=60.0):
-        pass
-
-    ''' <summary>
-        This is the entry point for the algorithm you'll write for your group project.
-        </summary>
-        <returns>results dictionary for GUI that contains three ints: cost of best solution, 
-        time spent to find best solution, total number of solutions found during search, the 
-        best solution found.  You may use the other three field however you like.
-        algorithm</returns> 
-    '''
-
+    # We're going to combine Convex Hull and insertion sort
     def fancy(self, time_allowance=60.0):
-        pass
+        results = {}
+        cities = self._scenario.getCities()
+        convexHull = ConvexHullSolver()
+        perimeter = convexHull.compute_hull(cities)
+
+        cities.sort(key=lambda city: city._qPoint.x())
+        ncities = len(cities)
+
+        foundTour = False
+        count = 0
+        bssf = None
+
+        end_time = time.time()
+        results['cost'] = bssf.cost if foundTour else math.inf
+        # results['time'] = end_time - start_time
+        results['count'] = count
+        results['soln'] = bssf
+        results['max'] = None
+        results['total'] = None
+        results['pruned'] = None
+        return results

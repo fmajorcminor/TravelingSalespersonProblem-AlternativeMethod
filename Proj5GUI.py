@@ -32,7 +32,7 @@ from TSPClasses import *
 class PointLineView( QWidget ):
 	def __init__( self, status_bar, data_range ):
 		super(QWidget,self).__init__()
-		self.setMinimumSize(950,600)
+		self.setMinimumSize(950,500)
 
 		self.pointList	= {}
 		self.edgeList	= {}
@@ -494,14 +494,14 @@ class Proj5GUI( QMainWindow ):
 		self.diffDropDown.addItem('Hard')
 		self.diffDropDown.addItem('Hard (Deterministic)')
 		self.diffDropDown.activated.connect(self.diffChanged)
-		self.diffDropDown.setCurrentIndex(3)
-		self.diffChanged(3) # to handle start state
+		self.diffDropDown.setCurrentIndex(0)
+		self.diffChanged(0) # to handle start state
 
 		for alg in self.ALGORITHMS:
 			self.algDropDown.addItem( alg[0] )
 		self.algDropDown.activated.connect(self.algChanged)
-		self.algDropDown.setCurrentIndex(2)
-		self.algChanged(2) # to handle start state
+		self.algDropDown.setCurrentIndex(3)
+		self.algChanged(3) # to handle start state
 
 		self.graphReady = False
 
