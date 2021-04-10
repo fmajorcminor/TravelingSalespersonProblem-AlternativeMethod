@@ -14,7 +14,7 @@ import time
 import numpy as np
 from random import randint
 from convex_hull import *
-
+from math import inf
 from TSPClasses import *
 
 
@@ -134,19 +134,71 @@ class TSPSolver:
     def fancy(self, time_allowance=60.0):
         results = {}
         cities = self._scenario.getCities()
+        # ncities = len(cities)
         convexHull = ConvexHullSolver()
-        perimeter = convexHull.compute_hull(cities)
-
-        cities.sort(key=lambda city: city._qPoint.x())
-        ncities = len(cities)
-
+        perimeter = convexHull.compute_hull(cities)  # This will return the cities that make up the perimeter
+        ogIndex = 0
+        # ogIndex = randint(0, len(perimeter) - 1)
+        path = [perimeter[0]]
+        bestConnectingPerimeter = []
+        currentCityIndex = 0
         foundTour = False
+        lengthBestPerimeter = len(bestConnectingPerimeter)
+        nextCityIndex = 1
+        start_time = time.time()
+
+        numTries = 15
+        numPointsTested = len(perimeter)
+
+        # This will find the best tour given the constraints.
+        # numPointsTested makes sure that it tests starting from each point
+        while not foundTour and numPointsTested > 0:
+            # try:
+            if nextCityIndex < len(perimeter) - 1 and perimeter[nextCityIndex] != path[0]:  # Out of bounds check
+                if perimeter[currentCityIndex].costTo(perimeter[nextCityIndex]) < inf:  # if path, add
+                    # it then move to next
+                    path.append(perimeter[nextCityIndex])
+                    currentCityIndex = nextCityIndex
+                nextCityIndex += 1
+            elif perimeter[nextCityIndex] == path[0]:  # Check for full path
+                outerTSPSol = TSPSolution(path)
+                if outerTSPSol.cost < inf and len(path) > lengthBestPerimeter:  # Check for best full path
+                    lengthBestPerimeter = len(path)
+                    bestConnectingPerimeter = path.copy()
+                    foundTour = True
+                if outerTSPSol.cost == inf:
+                    # This makes sure that at the end, we have at least some connected path - it's not
+                    # always great, but I'd say >85% of the time, it's pretty dang good
+                    while len(path) > 2 and not foundTour:
+                        path.pop()
+                        outerTSPSol = TSPSolution(path)
+                        if outerTSPSol.cost < inf:
+                            lengthBestPerimeter = len(path)
+                            bestConnectingPerimeter = path.copy()
+                            foundTour = True
+                numPointsTested -= 1
+                path.clear()
+                ogIndex += 1
+                currentCityIndex = ogIndex % len(perimeter)
+                path.append(perimeter[currentCityIndex])
+                nextCityIndex = (ogIndex + 1) % len(perimeter)
+
+            elif nextCityIndex == len(perimeter) - 1:
+                if perimeter[currentCityIndex].costTo(perimeter[0]) < inf:
+                    path.append(perimeter[nextCityIndex])
+                    currentCityIndex = len(perimeter) - 1
+                nextCityIndex = 0
+        # except IndexError:
+        #     print("Next City Index: ", nextCityIndex)
+        #     print("Length perimeter: ", len(perimeter))
+        #     print("Path[0]: ", path[0])
+
         count = 0
-        bssf = None
+        bssf = TSPSolution(bestConnectingPerimeter)
 
         end_time = time.time()
         results['cost'] = bssf.cost if foundTour else math.inf
-        # results['time'] = end_time - start_time
+        results['time'] = end_time - start_time
         results['count'] = count
         results['soln'] = bssf
         results['max'] = None

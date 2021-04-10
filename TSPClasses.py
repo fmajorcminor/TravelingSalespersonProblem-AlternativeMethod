@@ -145,7 +145,6 @@ class City:
     ''' <summary>
 		How much does it cost to get from this city to the destination?
 		Note that this is an asymmetric cost function.
-		 
 		In advanced mode, it returns infinity when there is no connection.
 		</summary> '''
     MAP_SCALE = 1000.0

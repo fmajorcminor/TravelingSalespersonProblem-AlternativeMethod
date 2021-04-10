@@ -494,8 +494,8 @@ class Proj5GUI( QMainWindow ):
 		self.diffDropDown.addItem('Hard')
 		self.diffDropDown.addItem('Hard (Deterministic)')
 		self.diffDropDown.activated.connect(self.diffChanged)
-		self.diffDropDown.setCurrentIndex(0)
-		self.diffChanged(0) # to handle start state
+		self.diffDropDown.setCurrentIndex(2)
+		self.diffChanged(2) # to handle start state
 
 		for alg in self.ALGORITHMS:
 			self.algDropDown.addItem( alg[0] )
