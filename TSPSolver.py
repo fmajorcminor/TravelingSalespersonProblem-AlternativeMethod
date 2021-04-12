@@ -196,6 +196,11 @@ class TSPSolver:
         count = 0
         bssf = TSPSolution(bestConnectingPerimeter)
 
+        #NOW that we have a reasonable perimeter, Start Insertions
+
+        bestPath = self.insertSolver(bestConnectingPerimeter)
+        bssf = TSPSolution(bestPath)
+
         end_time = time.time()
         results['cost'] = bssf.cost if foundTour else math.inf
         results['time'] = end_time - start_time
@@ -205,3 +210,70 @@ class TSPSolver:
         results['total'] = None
         results['pruned'] = None
         return results
+
+    def insertSolver(self, perimeterPoints):
+        path = perimeterPoints.copy()
+        #create a "cities left" array, with all cities not included in the perimeter
+        cities = self._scenario.getCities()
+        citiesLeft = []
+        for i in range(len(cities)) :
+            cityInPerimeter = False
+            for j in range(len(path)) :
+                if(cities[i]._name == path[j]._name) :
+                    cityInPerimeter = True
+            if(not cityInPerimeter) :
+                citiesLeft.append(cities[i])
+
+        #while "cities left" > 0
+        #   double for loop, find minimum distance to path city
+        #   insert the minimum city
+        while(len(citiesLeft) > 0) :
+            newCity = None
+            cityBeforeInsert = None
+            distanceRatio = np.inf
+            for i in range(len(citiesLeft)) :
+                for j in range(len(path) - 1) :
+                    if(path[j].costTo(path[j+1]) != 0):
+                        newD = (path[j].costTo(citiesLeft[i]) + citiesLeft[i].costTo(path[j+1]))/path[j].costTo(path[j+1])
+                        if(newD < distanceRatio) :
+                            distanceRatio = newD
+                            cityBeforeInsert = j
+                            newCity = citiesLeft[i]
+                            newCityIndex = i
+            #Check endpoints of path
+            for i in range(len(citiesLeft)) :
+                newD = (path[len(path) - 1].costTo(citiesLeft[i]) + citiesLeft[i].costTo(path[0]))/path[len(path) - 1].costTo(path[0])
+                if(newD < distanceRatio) :
+                        distanceRatio = newD
+                        cityBeforeInsert = len(path)-1
+                        newCity = citiesLeft[i]
+                        newCityIndex = i
+            citiesLeft, path = self.addCityToPath(path.copy(), cityBeforeInsert, newCity, citiesLeft.copy(), newCityIndex)
+
+        return path
+
+    def addCityToPath(self, path, cityBeforeInsert, newCity, citiesLeft, newCityIndex):
+        #newPath, copy path up to where city is inserted, append cityToInsert, then append the rest of the path
+        newCitiesLeft = []
+        newPath = []
+        #Craft the new path with inserted city
+        k = 0
+        while(k != cityBeforeInsert + 1):
+            newPath.append(path[k])
+            k += 1
+        newPath.append(newCity)
+        while(k < len(path)):
+            newPath.append(path[k])
+            k += 1
+        #Remove inserted city from Cities Left
+        k = 0
+        while(k != newCityIndex):
+            newCitiesLeft.append(citiesLeft[k])
+            k += 1
+        k = newCityIndex + 1
+        while(k < len(citiesLeft)):
+            newCitiesLeft.append(citiesLeft[k])
+            k += 1
+        
+        #return new path and cities left arrays
+        return newCitiesLeft, newPath
