@@ -1,0 +1,330 @@
+#!/usr/bin/python3
+
+from which_pyqt import PYQT_VER
+if PYQT_VER == 'PYQT5':
+	from PyQt5.QtCore import QLineF, QPointF
+elif PYQT_VER == 'PYQT4':
+	from PyQt4.QtCore import QLineF, QPointF
+else:
+	raise Exception('Unsupported Version of PyQt: {}'.format(PYQT_VER))
+
+
+
+
+import time
+import numpy as np
+from TSPClasses import *
+from queue import PriorityQueue
+import heapq
+import itertools
+
+
+
+class TSPSolver:
+	def __init__( self, gui_view ):
+		self._scenario = None
+
+	def setupWithScenario( self, scenario ):
+		self._scenario = scenario
+
+	def distanceCalc(self):
+		edges = self._scenario.getEdges()
+		cities = self._scenario.getCities()
+		self.dist_array = np.ones_like(edges) * np.inf
+		for i in range(self.dist_array.shape[0]):
+			for j in range(self.dist_array.shape[1]):
+				if edges[i,j]:
+					self.dist_array[i,j] = cities[i].costTo(cities[j])
+
+	def reduce_Matrix(self, matrixToReduce):
+		#Reduce Rows
+		bound = 0
+		for i in range(matrixToReduce.shape[0]):
+			min = np.inf
+			for j in range(matrixToReduce.shape[1]):
+				if (matrixToReduce[i,j] < min):
+					min = matrixToReduce[i,j]
+
+			if(min != np.inf):
+				bound += min
+				for j in range(matrixToReduce.shape[1]):
+					matrixToReduce[i,j] = matrixToReduce[i,j] - min
+
+		#Reduce Columns
+		for j in range(matrixToReduce.shape[1]):
+			min = np.inf
+			for i in range(matrixToReduce.shape[0]):
+				if (matrixToReduce[i,j] < min):
+					min = matrixToReduce[i,j]
+
+			
+			if(min != np.inf):
+				bound += min
+				for i in range(matrixToReduce.shape[0]):
+					matrixToReduce[i,j] = matrixToReduce[i,j] - min
+
+		return bound, matrixToReduce.copy()
+
+	def eraseCity(self, distance_array, cityToErase):
+		for i in range(distance_array.shape[0]):
+			distance_array[i,cityToErase] = np.inf
+			distance_array[cityToErase,i] = np.inf
+		return distance_array
+
+	''' <summary>
+		This is the entry point for the default solver
+		which just finds a valid random tour.  Note this could be used to find your
+		initial BSSF.
+		</summary>
+		<returns>results dictionary for GUI that contains three ints: cost of solution, 
+		time spent to find solution, number of permutations tried during search, the 
+		solution found, and three null values for fields not used for this 
+		algorithm</returns> 
+	'''
+	
+	def defaultRandomTour( self, time_allowance=60.0 ):
+		results = {}
+		cities = self._scenario.getCities()
+		ncities = len(cities)
+		foundTour = False
+		count = 0
+		bssf = None
+		start_time = time.time()
+		while not foundTour and time.time()-start_time < time_allowance:
+			# create a random permutation
+			perm = np.random.permutation( ncities )
+			route = []
+			# Now build the route using the random permutation
+			for i in range( ncities ):
+				route.append( cities[ perm[i] ] )
+			bssf = TSPSolution(route)
+			count += 1
+			if bssf.cost < np.inf:
+				# Found a valid route
+				foundTour = True
+		end_time = time.time()
+		results['cost'] = bssf.cost if foundTour else math.inf
+		results['time'] = end_time - start_time
+		results['count'] = count
+		results['soln'] = bssf
+		results['max'] = None
+		results['total'] = None
+		results['pruned'] = None
+		return results
+
+
+	''' <summary>
+		This is the entry point for the greedy solver, which you must implement for 
+		the group project (but it is probably a good idea to just do it for the branch-and
+		bound project as a way to get your feet wet).  Note this could be used to find your
+		initial BSSF.
+		</summary>
+		<returns>results dictionary for GUI that contains three ints: cost of best solution, 
+		time spent to find best solution, total number of solutions found, the best
+		solution found, and three null values for fields not used for this 
+		algorithm</returns> 
+	'''
+
+	def greedy( self,time_allowance=60.0 ):
+		results = {}
+		foundTour = False
+		cities = self._scenario.getCities()
+		ncities = len(cities)
+		self.distanceCalc()
+		count = 0
+		bssf = None
+		start_time = time.time()
+		#Choose a starting city
+		while not foundTour and time.time()-start_time < time_allowance:
+			tempDistanceArray = self.dist_array.copy()
+			start = np.random.randint(0, self.dist_array.shape[0]-1)
+			path = []
+			path.append(cities[start])
+			edgesIncluded = 0
+			currentCity = start
+			foundTour = True
+			for i in range(len(cities)):
+						tempDistanceArray[i,currentCity] = np.inf	
+			#While There are cities left to visit
+			while(edgesIncluded < len(cities)-1):
+				#Cycle through all unvisited and calculate distance
+				distance = np.inf
+				nextCity = np.inf
+				for j in range(len(cities)) :
+					if(tempDistanceArray[currentCity,j] < distance):
+						nextCity = j
+						distance = tempDistanceArray[currentCity,j]
+			#Choose that city, visit it, update current city
+				if(nextCity == np.inf):
+					foundTour = False
+					break
+				else :
+					path.append(cities[nextCity])
+					currentCity = nextCity
+					edgesIncluded += 1
+					for i in range(len(cities)):
+						tempDistanceArray[i,currentCity] = np.inf		
+				
+				#Return results as bssf
+
+		bssf = TSPSolution(path)
+		cost = bssf.cost
+		end_time = time.time()
+		results['cost'] = cost if foundTour else math.inf
+		results['time'] = end_time - start_time
+		results['count'] = count
+		results['soln'] = bssf
+		results['max'] = None
+		results['total'] = None
+		results['pruned'] = None
+		return results
+
+	#Greedy algorithm to decide BSSF for branch and bound
+
+	def greedyAsBSSF( self,time_allowance=60.0 ):
+		results = {}
+		foundTour = False
+		cities = self._scenario.getCities()
+		ncities = len(cities)
+		self.distanceCalc()
+		count = 0
+		bssf = None
+		start_time = time.time()
+		#Choose a starting city
+		while not foundTour and time.time()-start_time < time_allowance:
+			tempDistanceArray = self.dist_array.copy()
+			start = np.random.randint(0, self.dist_array.shape[0]-1)
+			path = []
+			path.append(cities[start])
+			edgesIncluded = 0
+			currentCity = start
+			foundTour = True
+			for i in range(len(cities)):
+						tempDistanceArray[i,currentCity] = np.inf	
+			#While There are cities left to visit
+			while(edgesIncluded < len(cities)-1):
+				#Cycle through all unvisited and calculate distance
+				distance = np.inf
+				nextCity = np.inf
+				for j in range(len(cities)) :
+					if(tempDistanceArray[currentCity,j] < distance):
+						nextCity = j
+						distance = tempDistanceArray[currentCity,j]
+			#Choose that city, visit it, update current city
+				if(nextCity == np.inf):
+					foundTour = False
+					break
+				else :
+					path.append(cities[nextCity])
+					currentCity = nextCity
+					edgesIncluded += 1
+					for i in range(len(cities)):
+						tempDistanceArray[i,currentCity] = np.inf		
+				
+				#Return results as bssf
+
+		bssf = TSPSolution(path)
+		return bssf
+
+	
+	
+	''' <summary>
+		This is the entry point for the branch-and-bound algorithm that you will implement
+		</summary>
+		<returns>results dictionary for GUI that contains three ints: cost of best solution, 
+		time spent to find best solution, total number solutions found during search (does
+		not include the initial BSSF), the best solution found, and three more ints: 
+		max queue size, total number of states created, and number of pruned states.</returns> 
+	'''
+		
+	def branchAndBound( self, time_allowance=60.0 ):
+		results = {}
+		foundTour = False
+		cities = self._scenario.getCities()
+		ncities = len(cities)
+		self.distanceCalc()
+		bssf = self.greedyAsBSSF()
+		bCostsf = bssf.cost
+		prunedPaths = 0
+		count = 1
+		totalStates = 0
+		maxQSize = 0
+		dummy = 0
+		start_time = time.time()
+
+		#Reduce Distance Matrix
+		start = np.random.randint(0, self.dist_array.shape[0]-1)
+		lowerbound, reduced_matrix = self.reduce_Matrix(self.dist_array)
+		q = PriorityQueue()
+		path = []
+		start = np.random.randint(0, self.dist_array.shape[0]-1)
+		path.append(cities[start])
+
+		#Add the beginning matrix to the queue
+		#Priority Queue Tuple: (Priority, cost, depth, matrix, path, currentCity)
+		q.put((0, dummy, lowerbound, 0, reduced_matrix, path, start))
+
+		while not q.empty() and time.time()-start_time < time_allowance:
+	    	#Get the top tuple, instantiate values
+			pripri, thedummyvalue, _cost,  _depth, _matrixtemp, _pathtemp, _curCity = q.get()
+			_matrix = _matrixtemp.copy()
+			_path = _pathtemp.copy()
+			if(q.qsize() > maxQSize):
+				maxQSize = q.qsize()
+			totalStates += 1
+
+			#for the number of cities:
+			for i in range(len(cities)) :
+				#if the cost of going to that city is less than bssf
+				if((_cost + _matrix[_curCity, i]) < bCostsf):
+					#Create new path with the city appended
+					newPath = _path.copy()
+					newPath.append(cities[i])
+					#IF PATH IS EQUAL TO THE SIZE OF LIST CITIES
+					if(len(newPath) == len(cities)):
+						#ADD AS NEW BSSF
+						bssf = TSPSolution(newPath) 
+						bCostsf = bssf.cost
+						count += 1
+						#Increment count? Total? idk what to increment. what is count and
+					else:
+						newCost = _cost + _matrix[_curCity, i]
+						#create a new matrix with that cities values changed to infinity
+						newMatrix = self.eraseCity(_matrix.copy(), _curCity)
+						#update matrix
+						newLowerBound, newMatrix = self.reduce_Matrix(newMatrix) 
+						newCost += newLowerBound
+						#add new state to priority queue with updated path, depth, cost, matrix
+						newDepth = _depth + 1
+						newPriority = newCost//(newDepth *newDepth)
+						dummy += 1
+						q.put((newPriority, dummy, newCost, newDepth, newMatrix, newPath, i))			
+				else:
+					#increment pruned states
+					prunedPaths += 1
+					totalStates += 1
+		
+		#RETURN ALL VALUES
+		cost = bssf.cost
+		end_time = time.time()
+		results['cost'] = cost
+		results['time'] = end_time - start_time
+		results['count'] = count # solutions
+		results['soln'] = bssf
+		results['max'] = maxQSize  # MAX queue size
+		results['total'] = totalStates	# total states
+		results['pruned'] = prunedPaths
+		return results
+
+
+	''' <summary>
+		This is the entry point for the algorithm you'll write for your group project.
+		</summary>
+		<returns>results dictionary for GUI that contains three ints: cost of best solution, 
+		time spent to find best solution, total number of solutions found during search, the 
+		best solution found.  You may use the other three field however you like.
+		algorithm</returns> 
+	'''
+		
+	def fancy( self,time_allowance=60.0 ):
+		pass
