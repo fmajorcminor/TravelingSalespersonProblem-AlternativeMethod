@@ -131,12 +131,12 @@ class TSPSolver:
         return results
 
     # We're going to combine Convex Hull and insertion sort
-    def fancy(self, time_allowance=60.0):
+    def fancy(self, time_allowance=60.0):  # n^2 at worst time n space
         results = {}
         cities = self._scenario.getCities()
         # ncities = len(cities)
         convexHull = ConvexHullSolver()
-        perimeter = convexHull.compute_hull(cities)  # This will return the cities that make up the perimeter
+        perimeter = convexHull.compute_hull(cities)  # This will return the cities that make up the perimeter - Worst O(n) space - (nlogn) time
         ogIndex = 0
         # ogIndex = randint(0, len(perimeter) - 1)
         path = [perimeter[0]]
@@ -211,7 +211,7 @@ class TSPSolver:
         results['pruned'] = None
         return results
 
-    def insertSolver(self, perimeterPoints):
+    def insertSolver(self, perimeterPoints):  # O(n^2) at worst 
         path = perimeterPoints.copy()
         #create a "cities left" array, with all cities not included in the perimeter
         cities = self._scenario.getCities()
